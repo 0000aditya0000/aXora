@@ -105,14 +105,6 @@ dist/           Production UI build
 
 ## Deploy on Vercel
 
-The dashboard build is static. Short links such as `/s/u86h` are not files in that build, so Vercel returns 404 until the API routes in this repo are deployed.
+Vercel does not keep a database unless you connect one. Short links still open: the copied URL includes the destination, and this browser remembers the links you created.
 
-Vercel functions do not keep `data/store.json`. Connect Redis before creating links:
-
-1. Open the Vercel project.
-2. Go to **Storage** and create a **Redis** database (Upstash).
-3. Connect that database to this project. Vercel adds `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
-4. Push this repo and redeploy.
-5. Create the short link again. A link created before Redis was connected was never saved, so the old `/s/...` URL will not redirect.
-
-After deploy, `https://your-app.vercel.app/api/health` should report `"storage": "redis"`. Opening `https://your-app.vercel.app/s/your-code` then redirects and counts a click.
+Shared click and QR totals across every visitor need Redis. In the Vercel project, open **Storage**, create a **Redis** database, connect it to the project, and redeploy. `https://your-app.vercel.app/api/health` then reports `"storage": "redis"`. Until then, a link copied from the dashboard redirects, and a bare `/s/code` from an older attempt does not.

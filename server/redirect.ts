@@ -1,6 +1,8 @@
 import {
   HttpError,
+  decodeLink,
   getLink,
+  normalizeDestination,
   passwordsMatch,
   recordVisit,
   visitorKey,
@@ -69,7 +71,17 @@ export async function applyVisit(req: IncomingRequest, res: OutgoingResponse, co
   try {
     const link = await getLink(code);
     if (!link) {
-      write(res, htmlResult(404, 'Link not found', '<h1>Link not found</h1><p>This short link does not exist. Create it again from the dashboard after storage is connected.</p>'));
+      const embedded = decodeLink(queryValue(req.query?.d));
+      if (!embedded) {
+        write(res, htmlResult(404, 'Link not found', '<h1>Link not found</h1><p>This short link does not exist. Create it again from the dashboard and use the copied link.</p>'));
+        return;
+      }
+      try {
+        const destination = normalizeDestination(embedded.a === 'Fallback' && embedded.f ? embedded.f : embedded.u);
+        write(res, { status: 302, location: destination, html: '', setCookie: '' });
+      } catch {
+        write(res, htmlResult(404, 'Link not found', '<h1>Link not found</h1><p>This short link does not point at a valid destination.</p>'));
+      }
       return;
     }
     if (link.edgeStatus !== 'Active') {
