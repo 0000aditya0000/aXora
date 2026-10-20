@@ -23,9 +23,50 @@ import { QRGeneratorView } from './components/QRGeneratorView';
 import HalftoneWordmarkFooter from './components/ui/halftone-wordmark-footer';
 import { Check } from 'lucide-react';
 
+const SAVED_LINKS_KEY = 'axora.links';
+
+function readSavedLinks(): ShortRoute[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVED_LINKS_KEY) || '[]') as ShortRoute[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedLinks(links: ShortRoute[]) {
+  try {
+    localStorage.setItem(SAVED_LINKS_KEY, JSON.stringify(links));
+  } catch {
+    // Ignore private-mode storage failures. The server copy is still used when it exists.
+  }
+}
+
+function mergeLinks(serverLinks: ShortRoute[], savedLinks: ShortRoute[]) {
+  const byCode = new Map<string, ShortRoute>();
+  for (const link of savedLinks) byCode.set(link.shortCode, link);
+  for (const link of serverLinks) {
+    const previous = byCode.get(link.shortCode);
+    if (!previous) {
+      byCode.set(link.shortCode, link);
+      continue;
+    }
+    byCode.set(link.shortCode, {
+      ...previous,
+      ...link,
+      clicks: Math.max(previous.clicks || 0, link.clicks || 0),
+      qrScans: Math.max(previous.qrScans || 0, link.qrScans || 0),
+      uniqueVisitors: Math.max(previous.uniqueVisitors || 0, link.uniqueVisitors || 0),
+      shortUrl: link.shortUrl || previous.shortUrl,
+      qrUrl: link.qrUrl || previous.qrUrl,
+    });
+  }
+  return [...byCode.values()].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('hub');
-  const [routes, setRoutes] = useState<ShortRoute[]>([]);
+  const [routes, setRoutes] = useState<ShortRoute[]>(() => readSavedLinks());
   const [blockedDomains, setBlockedDomains] = useState<BlockedDomain[]>(INITIAL_BLOCKED_DOMAINS);
   const [campaigns, setCampaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
   const [failoverLogs, setFailoverLogs] = useState<FailoverLogEvent[]>(INITIAL_FAILOVER_LOGS);
@@ -41,7 +82,8 @@ export default function App() {
     let cancelled = false;
     const pull = async () => {
       try {
-        const links = await listLinks();
+        const links = mergeLinks(await listLinks(), readSavedLinks());
+        writeSavedLinks(links);
         if (!cancelled) setRoutes(links);
       } catch {
         // Keep the last successful list if the API is briefly unreachable.
@@ -82,7 +124,11 @@ export default function App() {
   const handleSaveRoute = async (newRouteData: Partial<ShortRoute>) => {
     try {
       const created = await createLink(newRouteData);
-      setRoutes((prev) => [created, ...prev.filter((route) => route.id !== created.id)]);
+      setRoutes((prev) => {
+        const next = [created, ...prev.filter((route) => route.shortCode !== created.shortCode)];
+        writeSavedLinks(next);
+        return next;
+      });
       setCurrentView('campaigns');
       showNotification(`Short link ${shortLabel(created)} is live. Clicks and QR scans are tracked.`);
       return created;

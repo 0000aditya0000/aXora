@@ -62,10 +62,8 @@ const MAX_EVENTS = 20000;
 const REDIS_KEY = 'axora:store';
 const CODE_RE = /^[a-z0-9](?:[a-z0-9_-]{0,39})$/;
 
-export const STORAGE_SETUP_MESSAGE =
-  'Short links are not saved on this deployment yet. In Vercel, open Storage, create a Redis database, connect it to this project, redeploy, and create the link again.';
-
 let writeQueue: Promise<unknown> = Promise.resolve();
+let memoryStore: StoreData = { links: [], events: [] };
 
 function emptyStore(): StoreData {
   return { links: [], events: [] };
@@ -85,9 +83,9 @@ function redisConfig() {
   return { url: url.replace(/\/$/, ''), token };
 }
 
-export function storageMode(): 'redis' | 'file' | 'unconfigured' {
+export function storageMode(): 'redis' | 'file' | 'memory' {
   if (redisConfig()) return 'redis';
-  if (process.env.VERCEL) return 'unconfigured';
+  if (process.env.VERCEL) return 'memory';
   return 'file';
 }
 
@@ -109,7 +107,7 @@ function writeFileStore(data: StoreData) {
 
 async function redisCommand(command: unknown[]) {
   const config = redisConfig();
-  if (!config) throw new HttpError(503, STORAGE_SETUP_MESSAGE);
+  if (!config) throw new HttpError(503, 'Redis is not configured');
   const response = await fetch(config.url, {
     method: 'POST',
     headers: {
@@ -146,7 +144,7 @@ function trimStore(store: StoreData) {
 
 async function loadStore(): Promise<StoreData> {
   if (redisConfig()) return readRedis();
-  if (process.env.VERCEL) throw new HttpError(503, STORAGE_SETUP_MESSAGE);
+  if (process.env.VERCEL) return normalizeStore(JSON.parse(JSON.stringify(memoryStore)) as StoreData);
   return readFileStore();
 }
 
@@ -156,7 +154,10 @@ async function saveStore(store: StoreData) {
     await redisCommand(['SET', REDIS_KEY, JSON.stringify(store)]);
     return;
   }
-  if (process.env.VERCEL) throw new HttpError(503, STORAGE_SETUP_MESSAGE);
+  if (process.env.VERCEL) {
+    memoryStore = normalizeStore(JSON.parse(JSON.stringify(store)) as StoreData);
+    return;
+  }
   writeFileStore(store);
 }
 
@@ -459,6 +460,40 @@ export interface PublicLink extends LinkRecord {
   qrUrl: string;
 }
 
+export function encodeLink(link: Pick<LinkRecord, 'originalDestination' | 'fallbackDestination' | 'activeRoutingTarget'>) {
+  return Buffer.from(
+    JSON.stringify({
+      u: link.originalDestination,
+      f: link.fallbackDestination || undefined,
+      a: link.activeRoutingTarget || 'Primary',
+    })
+  ).toString('base64url');
+}
+
+export function decodeLink(token: string): { u: string; f?: string; a?: 'Primary' | 'Fallback' } | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(token, 'base64url').toString('utf8')) as {
+      u?: unknown;
+      f?: unknown;
+      a?: unknown;
+    };
+    if (!parsed || typeof parsed.u !== 'string') return null;
+    return {
+      u: parsed.u,
+      f: typeof parsed.f === 'string' ? parsed.f : undefined,
+      a: parsed.a === 'Fallback' ? 'Fallback' : 'Primary',
+    };
+  } catch {
+    return null;
+  }
+}
+
+function trackedUrl(baseUrl: string, kind: 's' | 'q', link: LinkRecord) {
+  const url = `${baseUrl}/${kind}/${link.shortCode}`;
+  if (storageMode() !== 'memory') return url;
+  return `${url}?d=${encodeLink(link)}`;
+}
+
 export function withStats(link: LinkRecord, events: EventRecord[], baseUrl: string): PublicLink {
   const mine = events.filter((event) => event.linkId === link.id);
   const clicks = mine.filter((event) => event.kind === 'click').length;
@@ -475,8 +510,8 @@ export function withStats(link: LinkRecord, events: EventRecord[], baseUrl: stri
     uniqueVisitors,
     ctr: total === 0 ? 0 : Math.round((uniqueVisitors / total) * 1000) / 10,
     currentTrafficRate,
-    shortUrl: `${baseUrl}/s/${link.shortCode}`,
-    qrUrl: `${baseUrl}/q/${link.shortCode}`,
+    shortUrl: trackedUrl(baseUrl, 's', link),
+    qrUrl: trackedUrl(baseUrl, 'q', link),
   };
 }
 
