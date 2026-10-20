@@ -1,0 +1,6 @@
+{
+  "name": "aXora — Enterprise Link Intelligence Platform",
+  "description": "Shorten links, enforce dynamic redirect rules, track real-time click analytics, and protect your brand domain with edge acceleration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

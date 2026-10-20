@@ -1,0 +1,107 @@
+{
+  "links": [
+    {
+      "id": "lnk_mvgq34it_6cf79f",
+      "shortCode": "yt8k",
+      "originalDestination": "https://www.youtube.com/watch?v=t8HrZTLRCeU",
+      "creator": "aXora",
+      "creatorRole": "Admin",
+      "edgeStatus": "Active",
+      "campaign": "Q3 Global Growth",
+      "tags": [
+        "#youtube",
+        "#video"
+      ],
+      "passcodeEnabled": false,
+      "clickThreshold": 10000,
+      "ttl": "30d",
+      "createdAt": "2026-10-20T13:32:17.189Z",
+      "failoverEnabled": false,
+      "maxLatencyThreshold": 2000,
+      "trafficRateCap": 500,
+      "httpFailoverCodes": [
+        "500",
+        "502",
+        "503",
+        "504",
+        "429"
+      ],
+      "activeRoutingTarget": "Primary",
+      "healthStatus": "Healthy",
+      "failoverEventsCount": 0
+    },
+    {
+      "id": "lnk_mvgq0vc0_4d2e3e",
+      "shortCode": "demo1",
+      "originalDestination": "https://example.com/welcome",
+      "creator": "aXora",
+      "creatorRole": "Admin",
+      "edgeStatus": "Active",
+      "campaign": "Launch",
+      "tags": [
+        "#new-link"
+      ],
+      "passcodeEnabled": false,
+      "clickThreshold": 10000,
+      "ttl": "30d",
+      "createdAt": "2026-10-20T13:30:31.968Z",
+      "failoverEnabled": false,
+      "maxLatencyThreshold": 2000,
+      "trafficRateCap": 500,
+      "httpFailoverCodes": [
+        "500",
+        "502",
+        "503",
+        "504",
+        "429"
+      ],
+      "activeRoutingTarget": "Primary",
+      "healthStatus": "Healthy",
+      "failoverEventsCount": 0
+    }
+  ],
+  "events": [
+    {
+      "id": "evt_mvgq128v_4d00ac",
+      "linkId": "lnk_mvgq0vc0_4d2e3e",
+      "shortCode": "demo1",
+      "kind": "click",
+      "timestamp": "2026-10-20T13:30:40.927Z",
+      "visitorId": "YKDChPrlP0ROM6dValVPiP",
+      "referrer": "direct",
+      "userAgent": "curl/8.21.0",
+      "device": "desktop",
+      "browser": "Bot",
+      "os": "Other",
+      "isBot": true
+    },
+    {
+      "id": "evt_mvgq12fz_dbd862",
+      "linkId": "lnk_mvgq0vc0_4d2e3e",
+      "shortCode": "demo1",
+      "kind": "scan",
+      "timestamp": "2026-10-20T13:30:41.183Z",
+      "visitorId": "YKDChPrlP0ROM6dValVPiP",
+      "referrer": "direct",
+      "userAgent": "curl/8.21.0",
+      "device": "desktop",
+      "browser": "Bot",
+      "os": "Other",
+      "isBot": true
+    },
+    {
+      "id": "evt_mvgq3e9i_985fdf",
+      "linkId": "lnk_mvgq34it_6cf79f",
+      "shortCode": "yt8k",
+      "kind": "click",
+      "timestamp": "2026-10-20T13:32:29.816Z",
+      "visitorId": "pFktkqc_902ZtnGbJ-4NQZ",
+      "referrer": "direct",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+      "device": "desktop",
+      "browser": "Chrome",
+      "os": "Windows",
+      "isBot": false
+    }
+  ]
+}
