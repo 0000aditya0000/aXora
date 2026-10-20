@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server/index.ts",
+    "dev": "node api.js && tsx server/index.ts",
     "dev:vite": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
+    "build": "node api.js && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
