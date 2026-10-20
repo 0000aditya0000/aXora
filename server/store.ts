@@ -59,7 +59,11 @@ interface StoreData {
 
 const DATA_PATH = path.resolve(process.cwd(), 'data', 'store.json');
 const MAX_EVENTS = 20000;
+const REDIS_KEY = 'axora:store';
 const CODE_RE = /^[a-z0-9](?:[a-z0-9_-]{0,39})$/;
+
+export const STORAGE_SETUP_MESSAGE =
+  'Short links are not saved on this deployment yet. In Vercel, open Storage, create a Redis database, connect it to this project, redeploy, and create the link again.';
 
 let writeQueue: Promise<unknown> = Promise.resolve();
 
@@ -67,34 +71,100 @@ function emptyStore(): StoreData {
   return { links: [], events: [] };
 }
 
-function readStore(): StoreData {
+function normalizeStore(parsed: Partial<StoreData> | null | undefined): StoreData {
+  return {
+    links: Array.isArray(parsed?.links) ? parsed.links : [],
+    events: Array.isArray(parsed?.events) ? parsed.events : [],
+  };
+}
+
+function redisConfig() {
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  return { url: url.replace(/\/$/, ''), token };
+}
+
+export function storageMode(): 'redis' | 'file' | 'unconfigured' {
+  if (redisConfig()) return 'redis';
+  if (process.env.VERCEL) return 'unconfigured';
+  return 'file';
+}
+
+function readFileStore(): StoreData {
   try {
     const raw = fs.readFileSync(DATA_PATH, 'utf8');
-    const parsed = JSON.parse(raw) as StoreData;
-    return {
-      links: Array.isArray(parsed.links) ? parsed.links : [],
-      events: Array.isArray(parsed.events) ? parsed.events : [],
-    };
+    return normalizeStore(JSON.parse(raw) as StoreData);
   } catch {
     return emptyStore();
   }
 }
 
-function writeStore(data: StoreData) {
+function writeFileStore(data: StoreData) {
   fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
   const tmp = `${DATA_PATH}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
   fs.renameSync(tmp, DATA_PATH);
 }
 
+async function redisCommand(command: unknown[]) {
+  const config = redisConfig();
+  if (!config) throw new HttpError(503, STORAGE_SETUP_MESSAGE);
+  const response = await fetch(config.url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(command),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { result?: unknown; error?: string };
+  if (!response.ok || payload.error) {
+    throw new HttpError(503, payload.error || 'Could not reach Redis storage');
+  }
+  return payload.result;
+}
+
+async function readRedis(): Promise<StoreData> {
+  const result = await redisCommand(['GET', REDIS_KEY]);
+  if (typeof result !== 'string' || !result) return emptyStore();
+  try {
+    return normalizeStore(JSON.parse(result) as StoreData);
+  } catch {
+    return emptyStore();
+  }
+}
+
+function trimStore(store: StoreData) {
+  if (store.events.length > MAX_EVENTS) {
+    store.events = store.events.slice(store.events.length - MAX_EVENTS);
+  }
+  while (JSON.stringify(store).length > 800_000 && store.events.length > 0) {
+    store.events.splice(0, Math.max(1, Math.ceil(store.events.length / 4)));
+  }
+}
+
+async function loadStore(): Promise<StoreData> {
+  if (redisConfig()) return readRedis();
+  if (process.env.VERCEL) throw new HttpError(503, STORAGE_SETUP_MESSAGE);
+  return readFileStore();
+}
+
+async function saveStore(store: StoreData) {
+  trimStore(store);
+  if (redisConfig()) {
+    await redisCommand(['SET', REDIS_KEY, JSON.stringify(store)]);
+    return;
+  }
+  if (process.env.VERCEL) throw new HttpError(503, STORAGE_SETUP_MESSAGE);
+  writeFileStore(store);
+}
+
 function mutate<T>(fn: (store: StoreData) => T): Promise<T> {
-  const run = writeQueue.then(() => {
-    const store = readStore();
+  const run = writeQueue.then(async () => {
+    const store = await loadStore();
     const result = fn(store);
-    if (store.events.length > MAX_EVENTS) {
-      store.events = store.events.slice(store.events.length - MAX_EVENTS);
-    }
-    writeStore(store);
+    await saveStore(store);
     return result;
   });
   writeQueue = run.then(

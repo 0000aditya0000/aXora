@@ -102,6 +102,20 @@
       "browser": "Chrome",
       "os": "Windows",
       "isBot": false
+    },
+    {
+      "id": "evt_mvgqtshj_5a420c",
+      "linkId": "lnk_mvgq0vc0_4d2e3e",
+      "shortCode": "demo1",
+      "kind": "click",
+      "timestamp": "2026-10-20T13:53:01.303Z",
+      "visitorId": "YKDChPrlP0ROM6dValVPiP",
+      "referrer": "direct",
+      "userAgent": "curl/8.21.0",
+      "device": "desktop",
+      "browser": "Bot",
+      "os": "Other",
+      "isBot": true
     }
   ]
 }
